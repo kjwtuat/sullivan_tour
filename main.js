@@ -180,12 +180,31 @@ if (!SpeechRecognition) {
     responseBox.style.display = 'flex';
 
     try {
-      // 1. 사용자 질문에서 유적지 이름 검색 (RAG 로직)
+      // 1. 사용자 질문에서 유적지 이름 검색 (RAG 로직 향상)
       let matchedSpot = null;
+      let matchedLength = 0;
+
       for (const spot of tourData) {
-        if (question.includes(spot.name)) {
-          matchedSpot = spot;
-          break;
+        // A. 괄호를 제외한 핵심 이름 덩어리가 통째로 포함된 경우 ("불국사 석축")
+        const cleanName = spot.name.replace(/\([^)]*\)/g, '').trim(); 
+        if (cleanName.length >= 2 && question.includes(cleanName)) {
+          if (cleanName.length > matchedLength) {
+            matchedSpot = spot;
+            matchedLength = cleanName.length;
+          }
+        }
+        
+        // B. 띄어쓰기나 괄호로 구분된 개별 단어가 포함된 경우 ("청운교", "백운교", "목어")
+        const words = spot.name.split(/[\s(),/]+/).filter(w => w.trim().length >= 2);
+        for (const word of words) {
+          const keyword = word.trim();
+          // 일반적인 단어(예: '및', '경주' 등) 필터링 생략: 관광지에 특화된 데이터이므로 단어가 매칭되면 우선 사용
+          if (question.includes(keyword)) {
+            if (keyword.length > matchedLength) {
+              matchedSpot = spot;
+              matchedLength = keyword.length;
+            }
+          }
         }
       }
 
