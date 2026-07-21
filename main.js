@@ -229,10 +229,11 @@ if (!SpeechRecognition) {
         prompt += `[지시사항]\n`;
         prompt += `위 [관광지 공식 참고 자료]를 최우선으로 바탕으로 사용자의 질문에 대답해.\n`;
         prompt += `자료에 없는 내용이라면 일반 지식으로 자연스럽게 대답해.\n`;
-        prompt += `사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하고, 음성 비서이므로 2~3문장 이내로 친절하게 말해.`;
+        prompt += `사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하고, 음성 비서이므로 2~3문장 이내로 친절하게 말해.\n`;
+        prompt += `절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 말고 순수 텍스트 문장으로만 대답해.`;
       } else {
         // 일반 대화 프롬프트
-        prompt = question + "\n(도우미로서 친절하게 2~3문장 이내로 짧게 대답해.)";
+        prompt = question + "\n(도우미로서 친절하게 2~3문장 이내로 짧게 대답해. 절대 '*', '#', 이모지, 이모티콘 등 특수기호나 서식을 사용하지 말고 순수 텍스트만 출력해.)";
       }
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
@@ -246,8 +247,11 @@ if (!SpeechRecognition) {
       if (!response.ok) throw new Error('API 호출 실패');
       
       const data = await response.json();
-      const answer = data.candidates[0].content.parts[0].text;
+      const rawAnswer = data.candidates[0].content.parts[0].text;
       
+      // 시각적, 청각적 깔끔함을 위해 불필요한 마크다운 특수기호(*, #) 및 이모지 강제 제거
+      const answer = rawAnswer.replace(/[*\#]/g, '').trim();
+
       responseText.textContent = answer;
       speakText(answer); // 응답을 음성으로 출력
     } catch (error) {
