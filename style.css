@@ -69,6 +69,8 @@ body {
 .glass-panel {
   width: 100%;
   min-height: 120px;
+  max-height: 250px;
+  overflow-y: auto;
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
