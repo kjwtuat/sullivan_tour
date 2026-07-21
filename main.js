@@ -156,13 +156,23 @@ if (!SpeechRecognition) {
     micBtn.classList.remove('listening');
   };
 
-  // TTS (텍스트 음성 변환) 함수
+  // 모바일 기기 감지 (User-Agent 기반)
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // TTS (Text-to-Speech) 함수
   function speakText(text) {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel(); // 기존 재생 중인 음성 취소
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ko-KR';
-    utterance.rate = 1.8; // 속도를 1.8배로 증가 (더 빠른 낭독)
+    
+    // PC와 스마트폰의 기본 TTS 엔진 속도 해석이 다르므로 분기 처리
+    if (isMobile) {
+      utterance.rate = 1.2; // 스마트폰은 엔진 특성상 기본 속도가 빨라서 1.2로 하향
+    } else {
+      utterance.rate = 1.8; // PC는 1.8배속
+    }
+    
     window.speechSynthesis.speak(utterance);
   }
 
