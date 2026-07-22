@@ -44,50 +44,75 @@ const nearbyLocation = document.getElementById('nearby-location');
 const nearbyName = document.getElementById('nearby-name');
 const nearbyDesc = document.getElementById('nearby-desc');
 
-if (navigator.geolocation) {
-  // 2초마다 현재 위치 갱신
-  setInterval(() => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const currentLat = position.coords.latitude;
-        const currentLon = position.coords.longitude;
-        gpsLat.textContent = currentLat.toFixed(6);
-        gpsLon.textContent = currentLon.toFixed(6);
+let gpsInterval = null;
 
-        // 15미터 이내의 가장 가까운 장소 찾기
-        let closestSpot = null;
-        let minDistance = 15; // 최대 반경 15m
+function fetchLocation() {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const currentLat = position.coords.latitude;
+      const currentLon = position.coords.longitude;
+      gpsLat.textContent = currentLat.toFixed(6);
+      gpsLon.textContent = currentLon.toFixed(6);
 
-        for (const spot of tourData) {
-          if (spot.lat && spot.lng) {
-            const distance = getDistance(currentLat, currentLon, spot.lat, spot.lng);
-            if (distance <= minDistance) {
-              closestSpot = spot;
-              minDistance = distance;
-            }
+      // 15미터 이내의 가장 가까운 장소 찾기
+      let closestSpot = null;
+      let minDistance = 15; // 최대 반경 15m
+
+      for (const spot of tourData) {
+        if (spot.lat && spot.lng) {
+          const distance = getDistance(currentLat, currentLon, spot.lat, spot.lng);
+          if (distance <= minDistance) {
+            closestSpot = spot;
+            minDistance = distance;
           }
         }
+      }
 
-        if (closestSpot) {
-          nearbyName.textContent = closestSpot.name;
-          nearbyDesc.textContent = closestSpot.descKo;
-          nearbyLocation.style.display = 'flex';
-        } else {
-          nearbyLocation.style.display = 'none';
-        }
-      },
-      (error) => {
-        console.error("GPS Error:", error);
-        gpsLat.textContent = "오류";
-        gpsLon.textContent = "오류";
-      },
-      { enableHighAccuracy: true }
-    );
-  }, 2000);
-} else {
-  gpsLat.textContent = "미지원";
-  gpsLon.textContent = "미지원";
+      if (closestSpot) {
+        nearbyName.textContent = closestSpot.name;
+        nearbyDesc.textContent = closestSpot.descKo;
+        nearbyLocation.style.display = 'flex';
+      } else {
+        nearbyLocation.style.display = 'none';
+      }
+    },
+    (error) => {
+      console.error("GPS Error:", error);
+      gpsLat.textContent = "오류";
+      gpsLon.textContent = "오류";
+    },
+    { enableHighAccuracy: true }
+  );
 }
+
+function startGpsPolling() {
+  if (navigator.geolocation && !gpsInterval) {
+    fetchLocation(); // 즉시 1회 실행
+    gpsInterval = setInterval(fetchLocation, 2000);
+  } else if (!navigator.geolocation) {
+    gpsLat.textContent = "미지원";
+    gpsLon.textContent = "미지원";
+  }
+}
+
+function stopGpsPolling() {
+  if (gpsInterval) {
+    clearInterval(gpsInterval);
+    gpsInterval = null;
+  }
+}
+
+// 초기 실행
+startGpsPolling();
+
+// 탭/브라우저가 숨겨지면 GPS 요청 중지, 다시 열리면 재개 (배터리 최적화)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopGpsPolling();
+  } else {
+    startGpsPolling();
+  }
+});
 
 let audioCtx = null;
 
