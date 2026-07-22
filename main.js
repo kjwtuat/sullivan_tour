@@ -25,6 +25,26 @@ saveKeyBtn.addEventListener('click', () => {
   }
 });
 
+// 모바일 기기 감지 (User-Agent 기반)
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+// TTS (Text-to-Speech) 함수
+function speakText(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel(); // 기존 재생 중인 음성 취소
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'ko-KR';
+  
+  // PC와 스마트폰의 기본 TTS 엔진 속도 해석이 다르므로 분기 처리
+  if (isMobile) {
+    utterance.rate = 1.2; // 스마트폰은 엔진 특성상 기본 속도가 빨라서 1.2로 하향
+  } else {
+    utterance.rate = 1.8; // PC는 1.8배속
+  }
+  
+  window.speechSynthesis.speak(utterance);
+}
+
 // 두 지점 간의 거리를 미터(m) 단위로 계산하는 하버사인 공식
 function getDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; // 지구 반경 (미터)
@@ -45,6 +65,7 @@ const nearbyName = document.getElementById('nearby-name');
 const nearbyDesc = document.getElementById('nearby-desc');
 
 let gpsInterval = null;
+let lastAnnouncedSpotName = null; // TTS 중복 재생 방지용
 
 function fetchLocation() {
   navigator.geolocation.getCurrentPosition(
@@ -72,8 +93,15 @@ function fetchLocation() {
         nearbyName.textContent = closestSpot.name;
         nearbyDesc.textContent = closestSpot.descKo;
         nearbyLocation.style.display = 'flex';
+        
+        // 새로 진입한 장소라면 TTS 재생
+        if (lastAnnouncedSpotName !== closestSpot.name) {
+          lastAnnouncedSpotName = closestSpot.name;
+          speakText(`근처에 ${closestSpot.name}이(가) 있습니다. ${closestSpot.descKo}`);
+        }
       } else {
         nearbyLocation.style.display = 'none';
+        lastAnnouncedSpotName = null; // 장소를 벗어나면 초기화
       }
     },
     (error) => {
@@ -244,26 +272,6 @@ if (!SpeechRecognition) {
     isListening = false;
     micBtn.classList.remove('listening');
   };
-
-  // 모바일 기기 감지 (User-Agent 기반)
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-  // TTS (Text-to-Speech) 함수
-  function speakText(text) {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // 기존 재생 중인 음성 취소
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ko-KR';
-    
-    // PC와 스마트폰의 기본 TTS 엔진 속도 해석이 다르므로 분기 처리
-    if (isMobile) {
-      utterance.rate = 1.2; // 스마트폰은 엔진 특성상 기본 속도가 빨라서 1.2로 하향
-    } else {
-      utterance.rate = 1.8; // PC는 1.8배속
-    }
-    
-    window.speechSynthesis.speak(utterance);
-  }
 
   let currentNewsContext = null; // 뉴스 상태 저장용 전역 변수
   let chatHistory = []; // 멀티턴 대화 기록 저장용 전역 변수
