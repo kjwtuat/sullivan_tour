@@ -223,8 +223,22 @@ if (!SpeechRecognition) {
       // 2. 상황에 따른 프롬프트 동적 조립
       let prompt = "";
       
-      // Case A: 명시적인 뉴스 요청 (새로운 뉴스 가져오기)
-      if (question.includes("뉴스") && !question.includes("몇 번") && !question.includes("자세히")) {
+      // 사용자가 뉴스를 선택하는 표현을 썼는지 검사 (정규식: 첫 번째, 두 번째, 1번, 2번 등)
+      const isSelection = question.match(/(첫|두|세|1|2|3|일|이|삼)[\s]*(번째|번)/) || question.includes("자세히") || question.includes("그 뉴스");
+
+      // Case B: 뉴스 컨텍스트가 유지되고 있고, 사용자가 특정 뉴스를 선택한 경우
+      if (currentNewsContext && currentNewsContext.length > 0 && !matchedSpot && isSelection) {
+        const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
+        prompt += `[방금 안내한 뉴스 목록]\n`;
+        currentNewsContext.forEach((item, idx) => {
+          const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
+          prompt += `${prefix} 뉴스\n- 제목: ${item.speakableTitle}\n- 상세내용: ${item.detailedSummary}\n\n`;
+        });
+        prompt += `[사용자 질문]\n${question}\n\n`;
+        prompt += `[지시사항]\n사용자의 질문이 위 3개의 뉴스 중 특정 뉴스를 선택하는 것이라면, 해당 뉴스의 '상세내용'을 아나운서처럼 자연스럽고 친절하게 읽어줘. (제목은 이미 안내했으니 상세내용 위주로 풀어줘)\n만약 사용자가 전혀 상관없는 일상 질문을 했다면 뉴스 목록은 무시하고 질문에 알맞게 대답해.\n절대 '*', '#', 이모지, 이모티콘 등 특수기호를 쓰지 마.`;
+      }
+      // Case A: 명시적인 새로운 뉴스 요청 ("뉴스 알려줘" 등)
+      else if (question.includes("뉴스") && !matchedSpot) {
         try {
           const datesRes = await fetch('https://kjwtuat.github.io/tinynews/data/index.json');
           if (!datesRes.ok) throw new Error("날짜 정보를 가져올 수 없습니다.");
@@ -255,17 +269,6 @@ if (!SpeechRecognition) {
           prompt = "뉴스 서버에 접속하는 중 오류가 발생했습니다. (이 상황을 사용자에게 자연스럽게 설명해줘)";
           currentNewsContext = null;
         }
-      }
-      // Case B: 뉴스 컨텍스트가 유지되고 있고, 관광지 검색은 안 된 경우 (뉴스 선택일 확률이 높음)
-      else if (currentNewsContext && currentNewsContext.length > 0 && !matchedSpot) {
-        const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
-        prompt += `[방금 안내한 뉴스 목록]\n`;
-        currentNewsContext.forEach((item, idx) => {
-          const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
-          prompt += `${prefix} 뉴스\n- 제목: ${item.speakableTitle}\n- 상세내용: ${item.detailedSummary}\n\n`;
-        });
-        prompt += `[사용자 질문]\n${question}\n\n`;
-        prompt += `[지시사항]\n사용자의 질문이 위 3개의 뉴스 중 특정 뉴스를 선택하는 것이라면, 해당 뉴스의 '상세내용'을 아나운서처럼 자연스럽고 친절하게 읽어줘. (제목은 이미 안내했으니 상세내용 위주로 풀어줘)\n만약 사용자가 전혀 상관없는 일상 질문을 했다면 뉴스 목록은 무시하고 질문에 알맞게 대답해.\n절대 '*', '#', 이모지, 이모티콘 등 특수기호를 쓰지 마.`;
       }
       // Case C: 관광지가 매칭되었거나 일반 대화인 경우
       else {
