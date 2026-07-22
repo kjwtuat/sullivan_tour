@@ -25,17 +25,56 @@ saveKeyBtn.addEventListener('click', () => {
   }
 });
 
+// 두 지점 간의 거리를 미터(m) 단위로 계산하는 하버사인 공식
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // 지구 반경 (미터)
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 // GPS 좌표 업데이트 로직
 const gpsLat = document.getElementById('gps-lat');
 const gpsLon = document.getElementById('gps-lon');
+const nearbyLocation = document.getElementById('nearby-location');
+const nearbyName = document.getElementById('nearby-name');
+const nearbyDesc = document.getElementById('nearby-desc');
 
 if (navigator.geolocation) {
   // 2초마다 현재 위치 갱신
   setInterval(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        gpsLat.textContent = position.coords.latitude.toFixed(6);
-        gpsLon.textContent = position.coords.longitude.toFixed(6);
+        const currentLat = position.coords.latitude;
+        const currentLon = position.coords.longitude;
+        gpsLat.textContent = currentLat.toFixed(6);
+        gpsLon.textContent = currentLon.toFixed(6);
+
+        // 15미터 이내의 가장 가까운 장소 찾기
+        let closestSpot = null;
+        let minDistance = 15; // 최대 반경 15m
+
+        for (const spot of tourData) {
+          if (spot.lat && spot.lng) {
+            const distance = getDistance(currentLat, currentLon, spot.lat, spot.lng);
+            if (distance <= minDistance) {
+              closestSpot = spot;
+              minDistance = distance;
+            }
+          }
+        }
+
+        if (closestSpot) {
+          nearbyName.textContent = closestSpot.name;
+          nearbyDesc.textContent = closestSpot.descKo;
+          nearbyLocation.style.display = 'flex';
+        } else {
+          nearbyLocation.style.display = 'none';
+        }
       },
       (error) => {
         console.error("GPS Error:", error);

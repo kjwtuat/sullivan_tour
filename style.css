@@ -251,3 +251,39 @@ body {
   font-size: 0.9rem;
   margin-top: -1.5rem;
 }
+
+.nearby-container {
+  display: flex;
+  width: 100%;
+  max-width: 400px;
+  background: rgba(16, 185, 129, 0.15);
+  backdrop-filter: blur(12px);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  margin-top: -1.5rem;
+  align-items: center;
+  gap: 1rem;
+  animation: fadein 0.5s;
+}
+
+.nearby-icon {
+  font-size: 2rem;
+}
+
+.nearby-info h3 {
+  color: #10b981;
+  margin-bottom: 0.2rem;
+  font-size: 1.1rem;
+}
+
+.nearby-info p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
