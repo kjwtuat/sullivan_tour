@@ -25,6 +25,31 @@ saveKeyBtn.addEventListener('click', () => {
   }
 });
 
+// GPS 좌표 업데이트 로직
+const gpsLat = document.getElementById('gps-lat');
+const gpsLon = document.getElementById('gps-lon');
+
+if (navigator.geolocation) {
+  // 2초마다 현재 위치 갱신
+  setInterval(() => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        gpsLat.textContent = position.coords.latitude.toFixed(6);
+        gpsLon.textContent = position.coords.longitude.toFixed(6);
+      },
+      (error) => {
+        console.error("GPS Error:", error);
+        gpsLat.textContent = "오류";
+        gpsLon.textContent = "오류";
+      },
+      { enableHighAccuracy: true }
+    );
+  }, 2000);
+} else {
+  gpsLat.textContent = "미지원";
+  gpsLon.textContent = "미지원";
+}
+
 let audioCtx = null;
 
 function playMicSound(isStart) {
@@ -179,6 +204,18 @@ if (!SpeechRecognition) {
   let currentNewsContext = null; // 뉴스 상태 저장용 전역 변수
   let chatHistory = []; // 멀티턴 대화 기록 저장용 전역 변수
 
+  // 날짜 키워드 분석 함수
+  function getRequestedDateIndex(text) {
+    if (text.includes("어제") || text.includes("하루 전") || text.includes("1일 전")) return 1;
+    if (text.includes("그저께") || text.includes("그제") || text.includes("이틀 전") || text.includes("2일 전")) return 2;
+    if (text.includes("3일 전") || text.includes("삼일 전") || text.includes("사흘 전")) return 3;
+    if (text.includes("4일 전") || text.includes("나흘 전")) return 4;
+    if (text.includes("5일 전") || text.includes("오일 전") || text.includes("닷새 전")) return 5;
+    if (text.includes("6일 전") || text.includes("육일 전") || text.includes("엿새 전")) return 6;
+    if (text.includes("1주일 전") || text.includes("일주일 전") || text.includes("7일 전") || text.includes("칠일 전")) return 7;
+    return 0; // 기본값은 최신(오늘)
+  }
+
   // Gemini API 호출 함수
   async function askGemini(question) {
     if (!geminiApiKey) {
@@ -222,7 +259,7 @@ if (!SpeechRecognition) {
       }
 
       // 2. 상황에 따른 System Instruction 동적 조립
-      let systemPrompt = "당신은 친절한 AI 관광 및 일상 비서 'TourAgent'입니다.\n사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하세요.\n음성 비서이므로 안내 데스크 직원이나 라디오 아나운서처럼 자연스러운 구어체로 2~3문장 이내로 짧고 명확하게 대답하세요.\n절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 마세요.\n\n";
+      let systemPrompt = "당신은 친절한 AI 관광 및 일상 비서입니다.\n답변을 시작할 때 '네, 투어에이전트입니다' 같은 자기소개나 인사말은 생략하고 곧바로 질문에 대한 답변만 시작하세요.\n사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하세요.\n음성 비서이므로 안내 데스크 직원이나 라디오 아나운서처럼 자연스러운 구어체로 2~3문장 이내로 짧고 명확하게 대답하세요.\n절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 마세요.\n\n";
       
       // 사용자가 뉴스를 선택하는 표현을 썼는지 검사 (정규식: 첫 번째, 두 번째, 1번, 2번 등)
       const isSelection = question.match(/(첫|두|세|1|2|3|일|이|삼)[\s]*(번째|번)/) || question.includes("자세히") || question.includes("그 뉴스");
@@ -245,15 +282,20 @@ if (!SpeechRecognition) {
           const dates = await datesRes.json();
           
           if (dates.length > 0) {
-            const newsRes = await fetch(`https://kjwtuat.github.io/tinynews/data/${dates[0]}.json`);
+            let dateIdx = getRequestedDateIndex(question);
+            dateIdx = Math.min(dateIdx, dates.length - 1);
+            const targetDate = dates[dateIdx];
+
+            const newsRes = await fetch(`https://kjwtuat.github.io/tinynews/data/${targetDate}.json`);
             if (!newsRes.ok) throw new Error("뉴스 데이터를 가져올 수 없습니다.");
             const newsItems = await newsRes.json();
             
-            // 상위 3개 뉴스만 컨텍스트에 저장
-            currentNewsContext = newsItems.slice(0, 3);
+            // 전체 뉴스 중 랜덤으로 3개 추출하여 컨텍스트에 저장
+            const shuffledNews = [...newsItems].sort(() => 0.5 - Math.random());
+            currentNewsContext = shuffledNews.slice(0, 3);
             
             const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
-            systemPrompt += `[오늘의 주요 뉴스 제목 (최신 데이터)]\n`;
+            systemPrompt += `[${targetDate} 주요 뉴스 제목]\n`;
             currentNewsContext.forEach((item, idx) => {
               const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
               systemPrompt += `${prefix} 소식입니다. ${item.speakableTitle}\n`;
@@ -277,15 +319,19 @@ if (!SpeechRecognition) {
           const dates = await datesRes.json();
           
           if (dates.length > 0) {
-            const weatherRes = await fetch(`https://kjwtuat.github.io/tinynews-weather/data/${dates[0]}.json`);
+            let dateIdx = getRequestedDateIndex(question);
+            dateIdx = Math.min(dateIdx, dates.length - 1);
+            const targetDate = dates[dateIdx];
+
+            const weatherRes = await fetch(`https://kjwtuat.github.io/tinynews-weather/data/${targetDate}.json`);
             if (!weatherRes.ok) throw new Error("날씨 데이터를 가져올 수 없습니다.");
             const weatherItems = await weatherRes.json();
             
-            systemPrompt += `[오늘의 종합 날씨 정보 (최신 데이터)]\n`;
+            systemPrompt += `[${targetDate} 종합 날씨 정보]\n`;
             weatherItems.forEach((item) => {
               systemPrompt += `[${item.originalTitle}]\n- ${item.detailedSummary}\n\n`;
             });
-            systemPrompt += `\n[지시사항]\n위 제공된 [오늘의 종합 날씨 정보] 4가지 파트(전국 날씨 요약, 주의 사항, 주요 도시 날씨, 내일 날씨 전망)를 모두 종합하여, 실제 방송국의 기상캐스터처럼 밝고 친절하고 자연스러운 구어체로 오늘의 날씨를 상세하게 브리핑해주세요. (예: "네! 오늘의 날씨 브리핑입니다. 서울은 낮 최고 30도...")`;
+            systemPrompt += `\n[지시사항]\n위 제공된 [${targetDate} 종합 날씨 정보] 4가지 파트를 모두 종합하여, 밝고 친절한 구어체로 해당 날짜의 날씨를 상세하게 브리핑해주세요. 단, 제공된 정보에 "안녕하세요", "AI 기상캐스터입니다" 같은 인사말이 있더라도 전부 무시하고, 절대 인사말 없이 바로 날씨 본론부터 시작하세요. (예: "오늘 전국 날씨는...")`;
           } else {
             systemPrompt += "현재 등록된 날씨 정보가 없습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
           }

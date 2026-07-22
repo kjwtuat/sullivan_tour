@@ -235,3 +235,19 @@ body {
     transform: rotate(360deg);
   }
 }
+
+.gps-container {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 400px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  padding: 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: -1.5rem;
+}
