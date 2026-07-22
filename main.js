@@ -269,7 +269,34 @@ if (!SpeechRecognition) {
           currentNewsContext = null;
         }
       }
-      // Case C: 관광지가 매칭되었거나 일반 대화인 경우
+      // Case C: 새로운 날씨 요청 ("날씨 알려줘" 등)
+      else if (question.includes("날씨") && !matchedSpot) {
+        try {
+          const datesRes = await fetch('https://kjwtuat.github.io/tinynews-weather/data/index.json');
+          if (!datesRes.ok) throw new Error("날짜 정보를 가져올 수 없습니다.");
+          const dates = await datesRes.json();
+          
+          if (dates.length > 0) {
+            const weatherRes = await fetch(`https://kjwtuat.github.io/tinynews-weather/data/${dates[0]}.json`);
+            if (!weatherRes.ok) throw new Error("날씨 데이터를 가져올 수 없습니다.");
+            const weatherItems = await weatherRes.json();
+            
+            systemPrompt += `[오늘의 종합 날씨 정보 (최신 데이터)]\n`;
+            weatherItems.forEach((item) => {
+              systemPrompt += `[${item.originalTitle}]\n- ${item.detailedSummary}\n\n`;
+            });
+            systemPrompt += `\n[지시사항]\n위 제공된 [오늘의 종합 날씨 정보] 4가지 파트(전국 날씨 요약, 주의 사항, 주요 도시 날씨, 내일 날씨 전망)를 모두 종합하여, 실제 방송국의 기상캐스터처럼 밝고 친절하고 자연스러운 구어체로 오늘의 날씨를 상세하게 브리핑해주세요. (예: "네! 오늘의 날씨 브리핑입니다. 서울은 낮 최고 30도...")`;
+          } else {
+            systemPrompt += "현재 등록된 날씨 정보가 없습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
+          }
+          currentNewsContext = null;
+        } catch (error) {
+          console.error("날씨 Fetch 에러:", error);
+          systemPrompt += "날씨 서버에 접속하는 중 오류가 발생했습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
+          currentNewsContext = null;
+        }
+      }
+      // Case D: 관광지가 매칭되었거나 일반 대화인 경우
       else {
         currentNewsContext = null; // 뉴스가 아닌 다른 화제이므로 뉴스 컨텍스트 초기화
         if (matchedSpot) {
