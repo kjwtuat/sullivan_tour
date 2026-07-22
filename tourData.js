@@ -24,7 +24,7 @@ export const tourData = [
     name: "IT3호관",
     lat: 35.8885968,
     lng: 128.6105624,
-    descKo: "잔자공학부 대학원 연구실이 있는 건물입니다.",
+    descKo: "전자공학부 대학원 연구실이 있는 건물입니다.",
     descEn: ""
   },
   {

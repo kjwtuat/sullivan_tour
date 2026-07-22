@@ -67,6 +67,14 @@ const nearbyDesc = document.getElementById('nearby-desc');
 let gpsInterval = null;
 let lastAnnouncedSpotName = null; // TTS 중복 재생 방지용
 
+// 한글 받침 여부를 확인하여 조사('이/가', '은/는', '을/를')를 붙여 반환하는 함수
+function getJosa(word, josa1, josa2) {
+  const lastChar = word.charCodeAt(word.length - 1);
+  if (lastChar < 0xAC00 || lastChar > 0xD7A3) return word + josa1;
+  const hasJongseong = (lastChar - 0xAC00) % 28 > 0;
+  return word + (hasJongseong ? josa1 : josa2);
+}
+
 function fetchLocation() {
   navigator.geolocation.getCurrentPosition(
     (position) => {
@@ -97,7 +105,8 @@ function fetchLocation() {
         // 새로 진입한 장소라면 TTS 재생
         if (lastAnnouncedSpotName !== closestSpot.name) {
           lastAnnouncedSpotName = closestSpot.name;
-          speakText(`근처에 ${closestSpot.name}이(가) 있습니다. ${closestSpot.descKo}`);
+          const nameWithJosa = getJosa(closestSpot.name, '이', '가');
+          speakText(`근처에 ${nameWithJosa} 있습니다. ${closestSpot.descKo}`);
         }
       } else {
         nearbyLocation.style.display = 'none';
