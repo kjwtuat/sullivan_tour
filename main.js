@@ -28,9 +28,15 @@ saveKeyBtn.addEventListener('click', () => {
 // 모바일 기기 감지 (User-Agent 기반)
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
+// 위치 안내 일시정지 상태 변수 (음성 대화 시 GPS 멘트 겹침 방지)
+let isLocationGuidancePaused = false;
+
 // TTS (Text-to-Speech) 함수
-function speakText(text) {
-  if (!window.speechSynthesis) return;
+function speakText(text, onEndCallback = null) {
+  if (!window.speechSynthesis) {
+    if (onEndCallback) onEndCallback();
+    return;
+  }
   window.speechSynthesis.cancel(); // 기존 재생 중인 음성 취소
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'ko-KR';
@@ -40,6 +46,11 @@ function speakText(text) {
     utterance.rate = 1.2; // 스마트폰은 엔진 특성상 기본 속도가 빨라서 1.2로 하향
   } else {
     utterance.rate = 1.8; // PC는 1.8배속
+  }
+  
+  if (onEndCallback) {
+    utterance.onend = onEndCallback;
+    utterance.onerror = onEndCallback; // 에러 시 복구
   }
   
   window.speechSynthesis.speak(utterance);
@@ -102,11 +113,13 @@ function fetchLocation() {
         nearbyDesc.textContent = closestSpot.descKo;
         nearbyLocation.style.display = 'flex';
         
-        // 새로 진입한 장소라면 TTS 재생
+        // 새로 진입한 장소라면 TTS 재생 (단, 음성 질의응답 중이 아닐 때만)
         if (lastAnnouncedSpotName !== closestSpot.name) {
           lastAnnouncedSpotName = closestSpot.name;
-          const nameWithJosa = getJosa(closestSpot.name, '이', '가');
-          speakText(`근처에 ${nameWithJosa} 있습니다. ${closestSpot.descKo}`);
+          if (!isLocationGuidancePaused) {
+            const nameWithJosa = getJosa(closestSpot.name, '이', '가');
+            speakText(`근처에 ${nameWithJosa} 있습니다. ${closestSpot.descKo}`);
+          }
         }
       } else {
         nearbyLocation.style.display = 'none';
@@ -502,7 +515,10 @@ if (!SpeechRecognition) {
       const answer = rawAnswer.replace(/[*\#]/g, '').trim();
 
       responseText.textContent = answer;
-      speakText(answer); // 응답을 음성으로 출력
+      speakText(answer, () => {
+        // AI 답변 재생이 완전히 끝나면 다시 GPS 위치 안내 활성화
+        isLocationGuidancePaused = false;
+      }); // 응답을 음성으로 출력
     } catch (error) {
       console.error(error);
       responseText.textContent = "답변을 가져오는 중 오류가 발생했습니다. API Key를 확인해 주세요.";
@@ -510,6 +526,7 @@ if (!SpeechRecognition) {
       if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
         chatHistory.pop();
       }
+      isLocationGuidancePaused = false; // 에러 발생 시 즉시 안내 복구
     } finally {
       stopLoadingSound(); // 대기 효과음 종료
       micBtn.classList.remove('loading');
@@ -526,6 +543,9 @@ if (!SpeechRecognition) {
     // 마이크 인식이 끝났고 인식된 텍스트가 있다면 Gemini에게 질문
     if (finalTranscript.trim() !== '') {
       askGemini(finalTranscript.trim());
+    } else {
+      // 아무 말 없이 종료된 경우 즉시 GPS 안내 복구
+      isLocationGuidancePaused = false;
     }
   };
 
@@ -538,8 +558,13 @@ if (!SpeechRecognition) {
         transcriptText.textContent = '마이크를 누르고 말씀해 주세요...';
         transcriptText.classList.add('placeholder');
       }
+      // 수동으로 중지했을 때, 인식된 텍스트가 없다면 바로 GPS 안내 복구
+      if (finalTranscript.trim() === '') {
+        isLocationGuidancePaused = false;
+      }
     } else {
-      // 새로 시작
+      // 새로 시작 (대화가 시작되므로 GPS 안내 일시정지)
+      isLocationGuidancePaused = true;
       if (window.speechSynthesis) window.speechSynthesis.cancel(); // 새로운 질문을 하면 기존 답변 읽던 것 중단
       stopLoadingSound(); // 혹시 로딩음이 실행 중이면 중단
       playMicSound(true); // 마이크 켜짐 효과음
