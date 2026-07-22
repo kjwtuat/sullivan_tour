@@ -1,162 +1,186 @@
 export const tourData = [
   {
-    name: "일청담",
-    type: 2, // 0, 도보길, 1: 차로, 2: 랜드마크, 3: 건물 
-    lat: 35.8890050,
-    lng: 128.6118496,
-    descKo: "경북대학교의 교화인 감꽃을 형상화한 상징적인 연못입니다.",
-    descEn: "Gyeongbokgung Palace was the main royal palace of the Joseon dynasty. Built in 1395, it is located in northern Seoul, South Korea."
-  },
-  {
-    name: "IT융복합관",
-    type: 3,
-    lat: 35.8883871,
-    lng: 128.6113975,
-    descKo: "컴퓨터 학부 사무실과 주요 강의실이 있는 건물입니다.",
-    descEn: ""
-  },
-  {
-    name: "IT4호관",
-    type: 3,
-    lat: 35.8884821,
-    lng: 128.6109592,
-    descKo: "컴퓨터 학부 강의실과 대학원 연구실이 있는 건물입니다.",
-    descEn: ""
-  },
-  {
-    name: "IT3호관",
-    type: 3,
-    lat: 35.8885968,
-    lng: 128.6105624,
-    descKo: "전자공학부 대학원 연구실이 있는 건물입니다.",
-    descEn: ""
-  },
-  {
-    name: "일청담로1",
+    name: "TYPE0_1",
     type: 0,
-    lat: 35.8885838,
-    lng: 128.6115703,
-    descKo: "일청담로1 입니다.",
+    lat: 35.8891503,
+    lng: 128.6118284,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "일청담로2",
+    name: "TYPE0_2",
     type: 0,
-    lat: 35.8886387,
-    lng: 128.6115969,
-    descKo: "일청담로2 입니다.",
+    lat: 35.8891503,
+    lng: 128.6116916,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "일청담로3",
+    name: "TYPE0_3",
     type: 0,
-    lat: 35.8887176,
-    lng: 128.6116545,
-    descKo: "일청담로3 입니다.",
+    lat: 35.8891633,
+    lng: 128.6115468,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "일청담로4",
+    name: "TYPE0_4",
     type: 0,
-    lat: 35.8887972,
-    lng: 128.6117140,
-    descKo: "일청담로4 입니다.",
+    lat: 35.889172,
+    lng: 128.6114287,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "일청담로5",
+    name: "TYPE0_5",
     type: 0,
-    lat: 35.8888589,
-    lng: 128.6117625,
-    descKo: "일청담로5 입니다.",
+    lat: 35.8891916,
+    lng: 128.6112893,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길1",
+    name: "TYPE0_6",
     type: 0,
-    lat: 35.8886259,
-    lng: 128.6113802,
-    descKo: "IT대학 4호관과 IT융복합관 부근입니다.",
+    lat: 35.8892003,
+    lng: 128.6111766,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길2",
+    name: "TYPE0_7",
     type: 0,
-    lat: 35.8886547,
-    lng: 128.6112128,
-    descKo: "IT대학 4호관과 IT융복합관 부근입니다.",
+    lat: 35.8892176,
+    lng: 128.611072,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길3",
+    name: "TYPE0_8",
     type: 0,
-    lat: 35.8886836,
-    lng: 128.6110134,
-    descKo: "IT대학 4호관 부근입니다.",
+    lat: 35.8892372,
+    lng: 128.6109325,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길4",
+    name: "TYPE0_9",
     type: 0,
-    lat: 35.8887009,
-    lng: 128.6108389,
-    descKo: "IT대학 4호관 부근입니다.",
+    lat: 35.8892481,
+    lng: 128.610785,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길5",
+    name: "TYPE0_10",
     type: 0,
-    lat: 35.8887297,
-    lng: 128.6106537,
-    descKo: "IT대학 3호관 부근입니다.",
+    lat: 35.8892611,
+    lng: 128.6106884,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길6",
+    name: "TYPE0_11",
     type: 0,
-    lat: 35.8887528,
-    lng: 128.6104685,
-    descKo: "IT대학 3호관 부근입니다.",
+    lat: 35.8891307,
+    lng: 128.6105919,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길7",
+    name: "TYPE0_12",
     type: 0,
-    lat: 35.8887817,
-    lng: 128.6102548,
-    descKo: "공대 12호관 부근입니다.",
+    lat: 35.8890308,
+    lng: 128.6105704,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길8",
+    name: "TYPE0_13",
     type: 0,
-    lat: 35.8888163,
-    lng: 128.6100375,
-    descKo: "공대 12호관 부근입니다.",
+    lat: 35.8889222,
+    lng: 128.6105463,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길9",
+    name: "TYPE0_14",
     type: 0,
-    lat: 35.8888452,
-    lng: 128.6098416,
-    descKo: "가로수길 끝 부분입니다.",
+    lat: 35.8888114,
+    lng: 128.6105275,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "가로수길10",
+    name: "TYPE0_15",
     type: 0,
-    lat: 35.8888913,
-    lng: 128.6096173,
-    descKo: "사거리 부근입니다.",
+    lat: 35.8887115,
+    lng: 128.6105114,
+    descKo: "",
     descEn: ""
   },
   {
-    name: "지도못",
-    type: 2,
-    lat: 35.8881471,
-    lng: 128.6099330,
-    descKo: "한반도를 형상화한 작은 연못입니다.",
+    name: "TYPE0_16",
+    type: 0,
+    lat: 35.8886963,
+    lng: 128.6106482,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_17",
+    type: 0,
+    lat: 35.8886789,
+    lng: 128.610785,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_18",
+    type: 0,
+    lat: 35.8886702,
+    lng: 128.6109138,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_19",
+    type: 0,
+    lat: 35.8886506,
+    lng: 128.6110452,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_20",
+    type: 0,
+    lat: 35.8886376,
+    lng: 128.6111981,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_21",
+    type: 0,
+    lat: 35.8886181,
+    lng: 128.6113268,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_22",
+    type: 0,
+    lat: 35.888605,
+    lng: 128.611477,
+    descKo: "",
+    descEn: ""
+  },
+  {
+    name: "TYPE0_23",
+    type: 0,
+    lat: 35.8885898,
+    lng: 128.6116353,
+    descKo: "",
     descEn: ""
   }
 ];
