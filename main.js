@@ -139,15 +139,51 @@ function stopGpsPolling() {
   }
 }
 
+// Screen Wake Lock API를 사용하여 화면 꺼짐 방지
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('화면 꺼짐 방지(Wake Lock) 활성화');
+      wakeLock.addEventListener('release', () => {
+        console.log('화면 꺼짐 방지(Wake Lock) 해제');
+      });
+    } else {
+      console.log('이 브라우저는 Wake Lock API를 지원하지 않거나 HTTPS 환경이 아닙니다.');
+    }
+  } catch (err) {
+    console.error(`Wake Lock 오류: ${err.name}, ${err.message}`);
+  }
+}
+
+// NoSleep.js (Wake Lock API의 강력한 대안, 비디오 재생 방식 - HTTP(로컬 네트워크) 테스트 환경에서도 완벽 작동)
+let noSleep = new NoSleep();
+let isNoSleepEnabled = false;
+
+// 브라우저 정책상 화면 꺼짐 방지(특히 비디오 방식)는 사용자의 '터치/클릭' 액션이 있어야만 시작할 수 있습니다.
+document.addEventListener('click', function enableNoSleep() {
+  document.removeEventListener('click', enableNoSleep, false);
+  if (!isNoSleepEnabled) {
+    noSleep.enable();
+    isNoSleepEnabled = true;
+    console.log('NoSleep.js 방식 화면 꺼짐 방지 완벽 활성화');
+  }
+}, false);
+
 // 초기 실행
 startGpsPolling();
+requestWakeLock(); // 앱 시작 시 화면 꺼짐 방지 요청
 
-// 탭/브라우저가 숨겨지면 GPS 요청 중지, 다시 열리면 재개 (배터리 최적화)
+// 탭/브라우저가 숨겨지면 GPS 요청 중지, 다시 열리면 재개 및 Wake Lock 재요청
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     stopGpsPolling();
   } else {
     startGpsPolling();
+    // 브라우저가 다시 활성화되면 Wake Lock을 다시 요청
+    requestWakeLock();
   }
 });
 
