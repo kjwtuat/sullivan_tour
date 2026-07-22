@@ -177,6 +177,7 @@ if (!SpeechRecognition) {
   }
 
   let currentNewsContext = null; // 뉴스 상태 저장용 전역 변수
+  let chatHistory = []; // 멀티턴 대화 기록 저장용 전역 변수
 
   // Gemini API 호출 함수
   async function askGemini(question) {
@@ -220,8 +221,8 @@ if (!SpeechRecognition) {
         }
       }
 
-      // 2. 상황에 따른 프롬프트 동적 조립
-      let prompt = "";
+      // 2. 상황에 따른 System Instruction 동적 조립
+      let systemPrompt = "당신은 친절한 AI 관광 및 일상 비서 'TourAgent'입니다.\n사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하세요.\n음성 비서이므로 안내 데스크 직원이나 라디오 아나운서처럼 자연스러운 구어체로 2~3문장 이내로 짧고 명확하게 대답하세요.\n절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 마세요.\n\n";
       
       // 사용자가 뉴스를 선택하는 표현을 썼는지 검사 (정규식: 첫 번째, 두 번째, 1번, 2번 등)
       const isSelection = question.match(/(첫|두|세|1|2|3|일|이|삼)[\s]*(번째|번)/) || question.includes("자세히") || question.includes("그 뉴스");
@@ -229,13 +230,12 @@ if (!SpeechRecognition) {
       // Case B: 뉴스 컨텍스트가 유지되고 있고, 사용자가 특정 뉴스를 선택한 경우
       if (currentNewsContext && currentNewsContext.length > 0 && !matchedSpot && isSelection) {
         const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
-        prompt += `[방금 안내한 뉴스 목록]\n`;
+        systemPrompt += `[방금 사용자에게 안내한 뉴스 목록]\n`;
         currentNewsContext.forEach((item, idx) => {
           const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
-          prompt += `${prefix} 뉴스\n- 제목: ${item.speakableTitle}\n- 상세내용: ${item.detailedSummary}\n\n`;
+          systemPrompt += `${prefix} 뉴스\n- 제목: ${item.speakableTitle}\n- 상세내용: ${item.detailedSummary}\n\n`;
         });
-        prompt += `[사용자 질문]\n${question}\n\n`;
-        prompt += `[지시사항]\n사용자의 질문이 위 3개의 뉴스 중 특정 뉴스를 선택하는 것이라면, 해당 뉴스의 '상세내용'을 아나운서처럼 자연스럽고 친절하게 읽어줘. (제목은 이미 안내했으니 상세내용 위주로 풀어줘)\n만약 사용자가 전혀 상관없는 일상 질문을 했다면 뉴스 목록은 무시하고 질문에 알맞게 대답해.\n절대 '*', '#', 이모지, 이모티콘 등 특수기호를 쓰지 마.`;
+        systemPrompt += `[지시사항]\n사용자의 최근 질문이 위 3개의 뉴스 중 특정 뉴스를 선택하는 것이라면, 해당 뉴스의 '상세내용'을 아나운서처럼 자연스럽고 친절하게 읽어주세요. (제목은 이미 안내했으니 상세내용 위주로 풀어주세요)\n만약 사용자가 전혀 상관없는 질문을 했다면 뉴스 목록은 무시하고 질문에 알맞게 대답하세요.`;
       }
       // Case A: 명시적인 새로운 뉴스 요청 ("뉴스 알려줘" 등)
       else if (question.includes("뉴스") && !matchedSpot) {
@@ -253,20 +253,19 @@ if (!SpeechRecognition) {
             currentNewsContext = newsItems.slice(0, 3);
             
             const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
-            prompt += `[오늘의 주요 뉴스 제목]\n`;
+            systemPrompt += `[오늘의 주요 뉴스 제목 (최신 데이터)]\n`;
             currentNewsContext.forEach((item, idx) => {
               const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
-              prompt += `${prefix} 소식입니다. ${item.speakableTitle}\n`;
+              systemPrompt += `${prefix} 소식입니다. ${item.speakableTitle}\n`;
             });
-            prompt += `\n[사용자 질문]\n${question}\n\n`;
-            prompt += `[지시사항]\n위 주요 뉴스 제목들을 첫 번째, 두 번째, 세 번째 소식 순서대로 아나운서처럼 자연스럽게 브리핑해주고, 마지막에 "자세히 듣고 싶은 뉴스가 있다면 '첫 번째', '두 번째' 등 순서나 제목을 말씀해 주세요."라고 덧붙여. 뉴스의 세부 내용은 아직 절대 말하지 마.\n절대 '*', '#', 이모지, 이모티콘 등 특수기호를 쓰지 마.`;
+            systemPrompt += `\n[지시사항]\n위 주요 뉴스 제목들을 첫 번째, 두 번째, 세 번째 소식 순서대로 아나운서처럼 자연스럽게 브리핑해주고, 마지막에 "자세히 듣고 싶은 뉴스가 있다면 '첫 번째', '두 번째' 등 순서나 제목을 말씀해 주세요."라고 덧붙이세요. 뉴스의 세부 내용은 아직 절대 말하지 마세요.`;
           } else {
-            prompt = "현재 등록된 뉴스가 없습니다. (이 상황을 사용자에게 자연스럽게 설명해줘)";
+            systemPrompt += "현재 등록된 뉴스가 없습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
             currentNewsContext = null;
           }
         } catch (error) {
           console.error("뉴스 Fetch 에러:", error);
-          prompt = "뉴스 서버에 접속하는 중 오류가 발생했습니다. (이 상황을 사용자에게 자연스럽게 설명해줘)";
+          systemPrompt += "뉴스 서버에 접속하는 중 오류가 발생했습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
           currentNewsContext = null;
         }
       }
@@ -274,27 +273,25 @@ if (!SpeechRecognition) {
       else {
         currentNewsContext = null; // 뉴스가 아닌 다른 화제이므로 뉴스 컨텍스트 초기화
         if (matchedSpot) {
-          prompt += `[관광지 공식 참고 자료]\n`;
-          prompt += `이름: ${matchedSpot.name}\n`;
-          prompt += `한국어 소개: ${matchedSpot.descKo}\n`;
-          prompt += `영어 소개: ${matchedSpot.descEn}\n\n`;
-          prompt += `[사용자 질문]\n${question}\n\n`;
-          prompt += `[지시사항]\n`;
-          prompt += `위 [관광지 공식 참고 자료]를 최우선으로 바탕으로 사용자의 질문에 대답해.\n`;
-          prompt += `자료에 없는 내용이라면 일반 지식으로 자연스럽게 대답해.\n`;
-          prompt += `사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하고, 음성 비서이므로 2~3문장 이내로 친절하게 말해.\n`;
-          prompt += `절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 말고 순수 텍스트 문장으로만 대답해.`;
+          systemPrompt += `[관광지 공식 참고 자료]\n`;
+          systemPrompt += `이름: ${matchedSpot.name}\n`;
+          systemPrompt += `한국어 소개: ${matchedSpot.descKo}\n`;
+          systemPrompt += `영어 소개: ${matchedSpot.descEn}\n\n`;
+          systemPrompt += `[지시사항]\n위 [관광지 공식 참고 자료]를 최우선으로 바탕으로 사용자의 질문에 대답하세요.\n자료에 없는 내용이라면 일반 지식으로 자연스럽게 대답하세요.`;
         } else {
-          // 일반 대화 프롬프트
-          prompt = question + "\n(도우미로서 친절하게 2~3문장 이내로 짧게 대답해. 절대 '*', '#', 이모지, 이모티콘 등 특수기호나 서식을 사용하지 말고 순수 텍스트만 출력해.)";
+          systemPrompt += "[지시사항]\n사용자의 질문에 친절하게 2~3문장 이내로 짧게 대답해주세요.";
         }
       }
-      
+
+      // 대화 기록에 사용자 질문 추가
+      chatHistory.push({ role: "user", parts: [{ text: question }] });
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: chatHistory
         })
       });
 
@@ -302,6 +299,14 @@ if (!SpeechRecognition) {
       
       const data = await response.json();
       const rawAnswer = data.candidates[0].content.parts[0].text;
+      
+      // 대화 기록에 AI 답변 추가
+      chatHistory.push({ role: "model", parts: [{ text: rawAnswer }] });
+      
+      // 대화 기록 길이 제한 (최대 20개 = 10턴 유지)
+      if (chatHistory.length > 20) {
+        chatHistory = chatHistory.slice(-20);
+      }
       
       // 시각적, 청각적 깔끔함을 위해 불필요한 마크다운 특수기호(*, #) 및 이모지 강제 제거
       const answer = rawAnswer.replace(/[*\#]/g, '').trim();
@@ -311,6 +316,10 @@ if (!SpeechRecognition) {
     } catch (error) {
       console.error(error);
       responseText.textContent = "답변을 가져오는 중 오류가 발생했습니다. API Key를 확인해 주세요.";
+      // API 실패 시 턴이 꼬이지 않도록 마지막 사용자 질문 롤백
+      if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
+        chatHistory.pop();
+      }
     } finally {
       stopLoadingSound(); // 대기 효과음 종료
       micBtn.classList.remove('loading');
