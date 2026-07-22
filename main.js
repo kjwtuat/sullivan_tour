@@ -176,6 +176,8 @@ if (!SpeechRecognition) {
     window.speechSynthesis.speak(utterance);
   }
 
+  let currentNewsContext = null; // 뉴스 상태 저장용 전역 변수
+
   // Gemini API 호출 함수
   async function askGemini(question) {
     if (!geminiApiKey) {
@@ -218,22 +220,71 @@ if (!SpeechRecognition) {
         }
       }
 
-      // 2. 프롬프트 동적 조립
+      // 2. 상황에 따른 프롬프트 동적 조립
       let prompt = "";
-      if (matchedSpot) {
-        prompt += `[관광지 공식 참고 자료]\n`;
-        prompt += `이름: ${matchedSpot.name}\n`;
-        prompt += `한국어 소개: ${matchedSpot.descKo}\n`;
-        prompt += `영어 소개: ${matchedSpot.descEn}\n\n`;
+      
+      // Case A: 명시적인 뉴스 요청 (새로운 뉴스 가져오기)
+      if (question.includes("뉴스") && !question.includes("몇 번") && !question.includes("자세히")) {
+        try {
+          const datesRes = await fetch('https://kjwtuat.github.io/tinynews/data/index.json');
+          if (!datesRes.ok) throw new Error("날짜 정보를 가져올 수 없습니다.");
+          const dates = await datesRes.json();
+          
+          if (dates.length > 0) {
+            const newsRes = await fetch(`https://kjwtuat.github.io/tinynews/data/${dates[0]}.json`);
+            if (!newsRes.ok) throw new Error("뉴스 데이터를 가져올 수 없습니다.");
+            const newsItems = await newsRes.json();
+            
+            // 상위 3개 뉴스만 컨텍스트에 저장
+            currentNewsContext = newsItems.slice(0, 3);
+            
+            const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
+            prompt += `[오늘의 주요 뉴스 제목]\n`;
+            currentNewsContext.forEach((item, idx) => {
+              const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
+              prompt += `${prefix} 소식입니다. ${item.speakableTitle}\n`;
+            });
+            prompt += `\n[사용자 질문]\n${question}\n\n`;
+            prompt += `[지시사항]\n위 주요 뉴스 제목들을 첫 번째, 두 번째, 세 번째 소식 순서대로 아나운서처럼 자연스럽게 브리핑해주고, 마지막에 "자세히 듣고 싶은 뉴스가 있다면 '첫 번째', '두 번째' 등 순서나 제목을 말씀해 주세요."라고 덧붙여. 뉴스의 세부 내용은 아직 절대 말하지 마.\n절대 '*', '#', 이모지, 이모티콘 등 특수기호를 쓰지 마.`;
+          } else {
+            prompt = "현재 등록된 뉴스가 없습니다. (이 상황을 사용자에게 자연스럽게 설명해줘)";
+            currentNewsContext = null;
+          }
+        } catch (error) {
+          console.error("뉴스 Fetch 에러:", error);
+          prompt = "뉴스 서버에 접속하는 중 오류가 발생했습니다. (이 상황을 사용자에게 자연스럽게 설명해줘)";
+          currentNewsContext = null;
+        }
+      }
+      // Case B: 뉴스 컨텍스트가 유지되고 있고, 관광지 검색은 안 된 경우 (뉴스 선택일 확률이 높음)
+      else if (currentNewsContext && currentNewsContext.length > 0 && !matchedSpot) {
+        const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
+        prompt += `[방금 안내한 뉴스 목록]\n`;
+        currentNewsContext.forEach((item, idx) => {
+          const prefix = ordinalPrefixes[idx] || `${idx + 1}번째`;
+          prompt += `${prefix} 뉴스\n- 제목: ${item.speakableTitle}\n- 상세내용: ${item.detailedSummary}\n\n`;
+        });
         prompt += `[사용자 질문]\n${question}\n\n`;
-        prompt += `[지시사항]\n`;
-        prompt += `위 [관광지 공식 참고 자료]를 최우선으로 바탕으로 사용자의 질문에 대답해.\n`;
-        prompt += `자료에 없는 내용이라면 일반 지식으로 자연스럽게 대답해.\n`;
-        prompt += `사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하고, 음성 비서이므로 2~3문장 이내로 친절하게 말해.\n`;
-        prompt += `절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 말고 순수 텍스트 문장으로만 대답해.`;
-      } else {
-        // 일반 대화 프롬프트
-        prompt = question + "\n(도우미로서 친절하게 2~3문장 이내로 짧게 대답해. 절대 '*', '#', 이모지, 이모티콘 등 특수기호나 서식을 사용하지 말고 순수 텍스트만 출력해.)";
+        prompt += `[지시사항]\n사용자의 질문이 위 3개의 뉴스 중 특정 뉴스를 선택하는 것이라면, 해당 뉴스의 '상세내용'을 아나운서처럼 자연스럽고 친절하게 읽어줘. (제목은 이미 안내했으니 상세내용 위주로 풀어줘)\n만약 사용자가 전혀 상관없는 일상 질문을 했다면 뉴스 목록은 무시하고 질문에 알맞게 대답해.\n절대 '*', '#', 이모지, 이모티콘 등 특수기호를 쓰지 마.`;
+      }
+      // Case C: 관광지가 매칭되었거나 일반 대화인 경우
+      else {
+        currentNewsContext = null; // 뉴스가 아닌 다른 화제이므로 뉴스 컨텍스트 초기화
+        if (matchedSpot) {
+          prompt += `[관광지 공식 참고 자료]\n`;
+          prompt += `이름: ${matchedSpot.name}\n`;
+          prompt += `한국어 소개: ${matchedSpot.descKo}\n`;
+          prompt += `영어 소개: ${matchedSpot.descEn}\n\n`;
+          prompt += `[사용자 질문]\n${question}\n\n`;
+          prompt += `[지시사항]\n`;
+          prompt += `위 [관광지 공식 참고 자료]를 최우선으로 바탕으로 사용자의 질문에 대답해.\n`;
+          prompt += `자료에 없는 내용이라면 일반 지식으로 자연스럽게 대답해.\n`;
+          prompt += `사용자가 한국어로 물으면 한국어로, 영어로 물으면 영어로 대답하고, 음성 비서이므로 2~3문장 이내로 친절하게 말해.\n`;
+          prompt += `절대 '*', '#', 이모지, 이모티콘 등 읽을 수 없는 특수기호나 마크다운 서식을 사용하지 말고 순수 텍스트 문장으로만 대답해.`;
+        } else {
+          // 일반 대화 프롬프트
+          prompt = question + "\n(도우미로서 친절하게 2~3문장 이내로 짧게 대답해. 절대 '*', '#', 이모지, 이모티콘 등 특수기호나 서식을 사용하지 말고 순수 텍스트만 출력해.)";
+        }
       }
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
