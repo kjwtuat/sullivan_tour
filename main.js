@@ -68,10 +68,10 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// 경량 2D GPS 칼만 필터 클래스 (위도/경도 노이즈 및 튐 방지)
+// 경량 2D GPS 칼만 필터 클래스 (지능형 속도 기반 동적 노이즈 제어 & 이중 안전망)
 class GPSKalmanFilter {
-  constructor(processNoise = 3) {
-    this.processNoise = processNoise; // Q: 프로세스 노이즈 (이동 민감도)
+  constructor(defaultProcessNoise = 0.8) {
+    this.defaultProcessNoise = defaultProcessNoise; // 기본 보행자 노이즈 (Q = 0.8)
     this.isInitialized = false;
     this.lat = 0;
     this.lon = 0;
@@ -79,14 +79,14 @@ class GPSKalmanFilter {
     this.timestamp = 0;
   }
 
-  process(lat, lon, accuracy, timestamp) {
+  process(lat, lon, accuracy, timestamp, hwSpeed = null) {
     if (!this.isInitialized) {
       this.lat = lat;
       this.lon = lon;
       this.variance = accuracy * accuracy;
       this.timestamp = timestamp;
       this.isInitialized = true;
-      return { lat: this.lat, lon: this.lon };
+      return { lat: this.lat, lon: this.lon, effectiveSpeed: 0, q: this.defaultProcessNoise };
     }
 
     const duration = (timestamp - this.timestamp) / 1000;
@@ -96,11 +96,39 @@ class GPSKalmanFilter {
       this.lon = lon;
       this.variance = accuracy * accuracy;
       this.timestamp = timestamp;
-      return { lat: this.lat, lon: this.lon };
+      return { lat: this.lat, lon: this.lon, effectiveSpeed: 0, q: this.defaultProcessNoise };
+    }
+
+    // --- [이중 안전망 속도 판정 로직] ---
+    let effectiveSpeed = null;
+
+    // 1순위: 하드웨어가 제공한 speed 검사 (m/s)
+    if (typeof hwSpeed === 'number' && !isNaN(hwSpeed) && hwSpeed >= 0) {
+      effectiveSpeed = hwSpeed;
+    } 
+    // 2순위 (하드웨어 speed 미지원 시): 이전 보정 좌표와 현재 좌표간 자가 속도 계산
+    else if (duration > 0) {
+      const movedDistance = getDistance(this.lat, this.lon, lat, lon);
+      effectiveSpeed = movedDistance / duration;
+    }
+
+    // 3순위 (동적 Process Noise Q 결정 및 Fallback)
+    let currentQ = this.defaultProcessNoise; // 기본 보행자 값 (0.8)
+    if (effectiveSpeed !== null) {
+      if (effectiveSpeed < 0.3) {
+        // 정지/미동 상태: 위치 떨림 방지 대폭 강화 (Q = 0.1)
+        currentQ = 0.1;
+      } else if (effectiveSpeed <= 2.0) {
+        // 보행 상태 (약 1.0 ~ 7.2 km/h): 보행자 최적 노이즈 (Q = 0.8)
+        currentQ = 0.8;
+      } else {
+        // 빠른 이동 / 차량 (7.2 km/h 초과): 반응성 향상 (Q = 2.0)
+        currentQ = 2.0;
+      }
     }
 
     if (duration > 0) {
-      this.variance += duration * this.processNoise * this.processNoise;
+      this.variance += duration * currentQ * currentQ;
       this.timestamp = timestamp;
     }
 
@@ -111,7 +139,12 @@ class GPSKalmanFilter {
     this.lon = this.lon + kalmanGain * (lon - this.lon);
     this.variance = (1 - kalmanGain) * this.variance;
 
-    return { lat: this.lat, lon: this.lon };
+    return { 
+      lat: this.lat, 
+      lon: this.lon, 
+      effectiveSpeed: effectiveSpeed !== null ? effectiveSpeed : 0, 
+      q: currentQ 
+    };
   }
 
   reset() {
@@ -149,13 +182,14 @@ function fetchLocation() {
       const rawLon = position.coords.longitude;
       const accuracy = position.coords.accuracy || 10;
       const timestamp = position.timestamp || Date.now();
+      const hwSpeed = position.coords.speed; // 하드웨어 속도 (null 일 수 있음)
 
-      // 칼만 필터를 통과하여 노이즈 제거 및 좌표 스무딩
-      const filtered = gpsFilter.process(rawLat, rawLon, accuracy, timestamp);
+      // 지능형 칼만 필터를 통과하여 노이즈 제거 및 좌표 스무딩
+      const filtered = gpsFilter.process(rawLat, rawLon, accuracy, timestamp, hwSpeed);
       const currentLat = filtered.lat;
       const currentLon = filtered.lon;
 
-      console.log(`[GPS Kalman] Raw: (${rawLat.toFixed(6)}, ${rawLon.toFixed(6)}, Acc: ${accuracy.toFixed(1)}m) -> Filtered: (${currentLat.toFixed(6)}, ${currentLon.toFixed(6)})`);
+      console.log(`[GPS Kalman] Raw: (${rawLat.toFixed(6)}, ${rawLon.toFixed(6)}, Acc: ${accuracy.toFixed(1)}m, Speed: ${filtered.effectiveSpeed.toFixed(1)}m/s, Q: ${filtered.q}) -> Filtered: (${currentLat.toFixed(6)}, ${currentLon.toFixed(6)})`);
 
       // 화면 UI 표출 (보정 좌표 & 원본 좌표 & 오차 범위를 모바일 화면에 모두 노출)
       gpsLat.textContent = currentLat.toFixed(6);
