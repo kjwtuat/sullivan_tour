@@ -476,6 +476,47 @@ if (!SpeechRecognition) {
     responseBox.style.display = 'flex';
 
     try {
+      // 0. 사용자의 명시적인 위치/장소 탐색 질의 처리 ("OO 위치 알려줘", "OO 어디야?" 등)
+      const isExplicitLocationSearch = question.includes("위치") || question.includes("어디") || question.includes("찾아") || question.includes("안내해");
+
+      if (isExplicitLocationSearch) {
+        let searchMatchedSpot = null;
+        let longestNameLen = 0;
+
+        for (const spot of tourData) {
+          if (spot.name && spot.name.trim() !== '' && !spot.name.startsWith("TYPE0_")) {
+            const cleanName = spot.name.replace(/\([^)]*\)/g, '').trim();
+            if (cleanName.length >= 2 && question.includes(cleanName)) {
+              if (cleanName.length > longestNameLen) {
+                searchMatchedSpot = spot;
+                longestNameLen = cleanName.length;
+              }
+            }
+          }
+        }
+
+        stopLoadingSound();
+        micBtn.classList.remove('loading');
+
+        if (searchMatchedSpot) {
+          const cleanName = searchMatchedSpot.name.replace(/\([^)]*\)/g, '').trim();
+          const nameWithJosa = getJosa(cleanName, '을', '를');
+          const replyText = `${nameWithJosa} 안내하겠습니다.`;
+          responseText.textContent = replyText;
+          speakText(replyText, () => {
+            isLocationGuidancePaused = false;
+          });
+          return; // Gemini 호출 없이 즉시 안내 및 리턴
+        } else {
+          const notFoundText = "요청하신 위치를 찾을 수 없습니다.";
+          responseText.textContent = notFoundText;
+          speakText(notFoundText, () => {
+            isLocationGuidancePaused = false;
+          });
+          return; // Gemini 호출 없이 즉시 안내 및 리턴
+        }
+      }
+
       // 1. 사용자 질문에서 유적지 이름 검색 (RAG 로직 향상)
       let matchedSpot = null;
       let matchedLength = 0;

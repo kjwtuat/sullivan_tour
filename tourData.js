@@ -1,6 +1,6 @@
 export const tourData = [
   {
-    name: "TYPE0_1",
+    name: "대구창경",
     type: 0,
     lat: 35.8841606,
     lng: 128.5958827,
@@ -48,7 +48,7 @@ export const tourData = [
     descEn: ""
   },
   {
-    name: "TYPE0_7",
+    name: "CU편의점",
     type: 0,
     lat: 35.883977,
     lng: 128.5950337,
@@ -120,7 +120,7 @@ export const tourData = [
     descEn: ""
   },
   {
-    name: "TYPE0_16",
+    name: "풍국면",
     type: 0,
     lat: 35.8836413,
     lng: 128.5938683,
@@ -128,7 +128,7 @@ export const tourData = [
     descEn: ""
   },
   {
-    name: "TYPE0_17",
+    name: "대구창경 남측 출입문",
     type: 0,
     lat: 35.8838252,
     lng: 128.5958898,
@@ -184,63 +184,63 @@ export const tourData = [
     descEn: ""
   },
   {
-    name: "TYPE0_24",
+    name: "카페동이",
     type: 0,
     lat: 35.8835982,
     lng: 128.5953385,
-    descKo: "카페 동이 출입문 앞",
+    descKo: "카페 동이 출입문 앞입니다.",
     descEn: ""
   },
   {
-    name: "TYPE0_25",
+    name: "굴뚝 남측",
     type: 0,
     lat: 35.8839912,
     lng: 128.5941312,
-    descKo: "굴뚝 앞 남측",
+    descKo: "굴뚝 앞 남측입니다.",
     descEn: ""
   },
   {
-    name: "TYPE0_26",
+    name: "굴뚝",
     type: 0,
     lat: 35.8841108,
     lng: 128.5941916,
-    descKo: "굴뚝 앞 북측",
+    descKo: "굴뚝 앞 북측입니다.",
     descEn: ""
   },
   {
-    name: "TYPE0_27",
+    name: "이병철 회장 동상",
     type: 0,
     lat: 35.883274,
     lng: 128.5937007,
-    descKo: "이병철 회장 동상 앞",
+    descKo: "이병철 회장 동상 앞입니다.",
     descEn: ""
   },
   {
-    name: "TYPE0_28",
+    name: "삼성상회",
     type: 0,
     lat: 35.8832469,
     lng: 128.5935371,
-    descKo: "삼성상회 앞",
+    descKo: "삼성상회 앞입니다.",
     descEn: ""
   },
   {
-    name: "TYPE0_29",
+    name: "메가커피",
     type: 0,
     lat: 35.8835255,
     lng: 128.5946249,
-    descKo: "메가 커피 앞",
+    descKo: "메가 커피 앞입니다.",
     descEn: ""
   },
   {
-    name: "TYPE0_30",
+    name: "벤처오피스",
     type: 0,
     lat: 35.8841284,
     lng: 128.5953627,
-    descKo: "벤처 오피스 서쪽 입구 앞",
+    descKo: "벤처오피스 서쪽 입구 앞",
     descEn: ""
   },
   {
-    name: "TYPE0_31",
+    name: "버거킹",
     type: 0,
     lat: 35.8838156,
     lng: 128.5947296,
