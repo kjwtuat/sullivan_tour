@@ -68,9 +68,65 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// 경량 2D GPS 칼만 필터 클래스 (위도/경도 노이즈 및 튐 방지)
+class GPSKalmanFilter {
+  constructor(processNoise = 3) {
+    this.processNoise = processNoise; // Q: 프로세스 노이즈 (이동 민감도)
+    this.isInitialized = false;
+    this.lat = 0;
+    this.lon = 0;
+    this.variance = -1; // P: 추정 오차 공분산
+    this.timestamp = 0;
+  }
+
+  process(lat, lon, accuracy, timestamp) {
+    if (!this.isInitialized) {
+      this.lat = lat;
+      this.lon = lon;
+      this.variance = accuracy * accuracy;
+      this.timestamp = timestamp;
+      this.isInitialized = true;
+      return { lat: this.lat, lon: this.lon };
+    }
+
+    const duration = (timestamp - this.timestamp) / 1000;
+    // 10초 이상 갱신이 멈췄거나 끊긴 경우 새로 초기화
+    if (duration > 10) {
+      this.lat = lat;
+      this.lon = lon;
+      this.variance = accuracy * accuracy;
+      this.timestamp = timestamp;
+      return { lat: this.lat, lon: this.lon };
+    }
+
+    if (duration > 0) {
+      this.variance += duration * this.processNoise * this.processNoise;
+      this.timestamp = timestamp;
+    }
+
+    const measurementNoise = accuracy * accuracy;
+    const kalmanGain = this.variance / (this.variance + measurementNoise);
+
+    this.lat = this.lat + kalmanGain * (lat - this.lat);
+    this.lon = this.lon + kalmanGain * (lon - this.lon);
+    this.variance = (1 - kalmanGain) * this.variance;
+
+    return { lat: this.lat, lon: this.lon };
+  }
+
+  reset() {
+    this.isInitialized = false;
+  }
+}
+
+const gpsFilter = new GPSKalmanFilter();
+
 // GPS 좌표 업데이트 로직
 const gpsLat = document.getElementById('gps-lat');
 const gpsLon = document.getElementById('gps-lon');
+const gpsRawLat = document.getElementById('gps-raw-lat');
+const gpsRawLon = document.getElementById('gps-raw-lon');
+const gpsAcc = document.getElementById('gps-acc');
 const nearbyLocation = document.getElementById('nearby-location');
 const nearbyName = document.getElementById('nearby-name');
 const nearbyDesc = document.getElementById('nearby-desc');
@@ -89,10 +145,24 @@ function getJosa(word, josa1, josa2) {
 function fetchLocation() {
   navigator.geolocation.getCurrentPosition(
     (position) => {
-      const currentLat = position.coords.latitude;
-      const currentLon = position.coords.longitude;
+      const rawLat = position.coords.latitude;
+      const rawLon = position.coords.longitude;
+      const accuracy = position.coords.accuracy || 10;
+      const timestamp = position.timestamp || Date.now();
+
+      // 칼만 필터를 통과하여 노이즈 제거 및 좌표 스무딩
+      const filtered = gpsFilter.process(rawLat, rawLon, accuracy, timestamp);
+      const currentLat = filtered.lat;
+      const currentLon = filtered.lon;
+
+      console.log(`[GPS Kalman] Raw: (${rawLat.toFixed(6)}, ${rawLon.toFixed(6)}, Acc: ${accuracy.toFixed(1)}m) -> Filtered: (${currentLat.toFixed(6)}, ${currentLon.toFixed(6)})`);
+
+      // 화면 UI 표출 (보정 좌표 & 원본 좌표 & 오차 범위를 모바일 화면에 모두 노출)
       gpsLat.textContent = currentLat.toFixed(6);
       gpsLon.textContent = currentLon.toFixed(6);
+      if (gpsRawLat) gpsRawLat.textContent = rawLat.toFixed(6);
+      if (gpsRawLon) gpsRawLon.textContent = rawLon.toFixed(6);
+      if (gpsAcc) gpsAcc.textContent = accuracy.toFixed(1);
 
       // 15미터 이내의 가장 가까운 장소 찾기
       let closestSpot = null;
@@ -130,6 +200,9 @@ function fetchLocation() {
       console.error("GPS Error:", error);
       gpsLat.textContent = "오류";
       gpsLon.textContent = "오류";
+      if (gpsRawLat) gpsRawLat.textContent = "오류";
+      if (gpsRawLon) gpsRawLon.textContent = "오류";
+      if (gpsAcc) gpsAcc.textContent = "-";
     },
     { enableHighAccuracy: true }
   );
@@ -137,8 +210,9 @@ function fetchLocation() {
 
 function startGpsPolling() {
   if (navigator.geolocation && !gpsInterval) {
+    gpsFilter.reset(); // 폴링 시작 시 필터 초기화
     fetchLocation(); // 즉시 1회 실행
-    gpsInterval = setInterval(fetchLocation, 2000);
+    gpsInterval = setInterval(fetchLocation, 1000);
   } else if (!navigator.geolocation) {
     gpsLat.textContent = "미지원";
     gpsLon.textContent = "미지원";
@@ -149,6 +223,7 @@ function stopGpsPolling() {
   if (gpsInterval) {
     clearInterval(gpsInterval);
     gpsInterval = null;
+    gpsFilter.reset();
   }
 }
 
