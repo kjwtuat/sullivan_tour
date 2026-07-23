@@ -510,8 +510,53 @@ if (!SpeechRecognition) {
       // 사용자가 뉴스를 선택하는 표현을 썼는지 검사 (정규식: 첫 번째, 두 번째, 1번, 2번 등)
       const isSelection = question.match(/(첫|두|세|1|2|3|일|이|삼)[\s]*(번째|번)/) || question.includes("자세히") || question.includes("그 뉴스");
 
+      // 환율 최우선 매칭 키워드 리스트
+      const exchangeKeywords = ['환율', '달러', '엔화', '유로', '위안', '파운드', '환전', '외환', '원달러', '원엔'];
+      const isExchangeRequest = exchangeKeywords.some(keyword => question.includes(keyword));
+
+      // Case 0 (최우선 순위): 환율 및 외환 관련 질문인 경우 ("환율 뉴스 알려줘" 포함)
+      if (isExchangeRequest) {
+        try {
+          const datesRes = await fetch('https://kjwtuat.github.io/tinynews-exchangerate/data/index.json');
+          if (!datesRes.ok) throw new Error("환율 날짜 정보를 가져올 수 없습니다.");
+          const dates = await datesRes.json();
+          
+          if (dates.length > 0) {
+            let dateIdx = getRequestedDateIndex(question);
+            dateIdx = Math.min(dateIdx, dates.length - 1);
+            const targetDate = dates[dateIdx];
+
+            const exRes = await fetch(`https://kjwtuat.github.io/tinynews-exchangerate/data/${targetDate}.json`);
+            if (!exRes.ok) throw new Error("환율 데이터를 가져올 수 없습니다.");
+            const exData = await exRes.json();
+            
+            systemPrompt += `[${targetDate} 최신 환율 및 외환 뉴스 정보]\n`;
+            systemPrompt += `전체 요약: ${exData.speakableTitle}\n\n`;
+            systemPrompt += `[주요 통화별 환율 수치]\n`;
+            if (exData.rates && Array.isArray(exData.rates)) {
+              exData.rates.forEach(r => {
+                systemPrompt += `- ${r.name}(${r.code}): ${r.value}원 (${r.change} ${r.changeText})\n`;
+              });
+            }
+            systemPrompt += `\n[외환 시장 세부 분석 및 환전 팁]\n`;
+            if (exData.script && Array.isArray(exData.script)) {
+              exData.script.forEach(item => {
+                systemPrompt += `[${item.originalTitle}]\n- ${item.detailedSummary}\n\n`;
+              });
+            }
+            systemPrompt += `\n[지시사항]\n위 제공된 [${targetDate} 최신 환율 및 외환 뉴스 정보]를 바탕으로, 사용자의 질문에 맞춰 정확하고 밝은 구어체로 2~3문장 이내로 브리핑해주세요. 수치가 요구되면 정확한 원화 가격과 변동폭을 안내해 주세요. 단, "안녕하세요" 같은 인사말은 생략하고 곧바로 본론부터 시작하세요.`;
+          } else {
+            systemPrompt += "현재 등록된 환율 정보가 없습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
+          }
+          currentNewsContext = null;
+        } catch (error) {
+          console.error("환율 Fetch 에러:", error);
+          systemPrompt += "환율 데이터 서버에 접속하는 중 오류가 발생했습니다. 이 상황을 사용자에게 자연스럽게 설명해주세요.";
+          currentNewsContext = null;
+        }
+      }
       // Case B: 뉴스 컨텍스트가 유지되고 있고, 사용자가 특정 뉴스를 선택한 경우
-      if (currentNewsContext && currentNewsContext.length > 0 && !matchedSpot && isSelection) {
+      else if (currentNewsContext && currentNewsContext.length > 0 && !matchedSpot && isSelection) {
         const ordinalPrefixes = ["첫 번째", "두 번째", "세 번째"];
         systemPrompt += `[방금 사용자에게 안내한 뉴스 목록]\n`;
         currentNewsContext.forEach((item, idx) => {
