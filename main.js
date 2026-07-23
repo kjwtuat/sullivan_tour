@@ -68,6 +68,185 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// 두 지점 간의 방위각(Bearing: 0 ~ 360도) 계산 함수
+function getBearing(lat1, lon1, lat2, lon2) {
+  const radLat1 = (lat1 * Math.PI) / 180;
+  const radLat2 = (lat2 * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const y = Math.sin(dLon) * Math.cos(radLat2);
+  const x = Math.cos(radLat1) * Math.sin(radLat2) - Math.sin(radLat1) * Math.cos(radLat2) * Math.cos(dLon);
+
+  let brng = (Math.atan2(y, x) * 180) / Math.PI;
+  return (brng + 360) % 360; // 0 ~ 360도 정규화
+}
+
+// Web Audio API 3D 공간 음향 내비게이션 클래스 (Spatial Audio Beacon Guide)
+class SpatialAudioGuide {
+  constructor() {
+    this.audioCtx = null;
+    this.targetSpot = null;
+    this.isActive = false;
+    this.timerId = null;
+    this.currentDistance = 9999;
+    this.currentRelativeAngle = 0;
+  }
+
+  initContext() {
+    if (!this.audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        this.audioCtx = new AudioContextClass();
+      }
+    }
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
+    }
+  }
+
+  start(targetSpot) {
+    this.initContext();
+    this.targetSpot = targetSpot;
+    this.isActive = true;
+    console.log(`[Spatial Audio] 가이드 시작: ${targetSpot.name}`);
+    this.scheduleNextPing(500); // 0.5초 뒤 첫 핑 재생 시작
+  }
+
+  stop() {
+    this.isActive = false;
+    this.targetSpot = null;
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = null;
+    }
+    console.log("[Spatial Audio] 가이드 중지");
+  }
+
+  update(currentLat, currentLon, currentHeading) {
+    if (!this.isActive || !this.targetSpot || !this.targetSpot.lat || !this.targetSpot.lng) return;
+
+    // 1. 목적지와의 거리 계산
+    this.currentDistance = getDistance(currentLat, currentLon, this.targetSpot.lat, this.targetSpot.lng);
+
+    // 2. 목적지의 절대 방위각(Bearing) 계산
+    const targetBearing = getBearing(currentLat, currentLon, this.targetSpot.lat, this.targetSpot.lng);
+
+    // 3. 내 스마트폰 향(Heading) 기준 목적지 상대 각도 계산 (-180 ~ +180도)
+    let relativeAngle = (targetBearing - currentHeading + 540) % 360 - 180;
+    this.currentRelativeAngle = relativeAngle;
+
+    console.log(`[Spatial Guide] 거리: ${this.currentDistance.toFixed(1)}m, 상대 각도: ${relativeAngle.toFixed(1)}°`);
+
+    // 4. 3m 이내 도달 시 도착 처리
+    if (this.currentDistance <= 3.0) {
+      this.playArrivalChime();
+      const spotName = this.targetSpot.name.replace(/\([^)]*\)/g, '').trim();
+      const arrivalMsg = `목적지인 ${getJosa(spotName, '에', '에')} 도착했습니다.`;
+      this.stop();
+
+      responseText.textContent = arrivalMsg;
+      speakText(arrivalMsg, () => {
+        isLocationGuidancePaused = false;
+      });
+    }
+  }
+
+  scheduleNextPing(delayMs) {
+    if (!this.isActive) return;
+    if (this.timerId) clearTimeout(this.timerId);
+
+    this.timerId = setTimeout(() => {
+      if (!this.isActive) return;
+      this.playBeaconSound();
+
+      // 거리(Distance)에 따른 다음 핑 간격 계산
+      let nextInterval = 2000; // 30m 이상: 2초
+      if (this.currentDistance <= 10.0) {
+        nextInterval = 600; // 10m 이내: 0.6초 (빠름)
+      } else if (this.currentDistance <= 30.0) {
+        nextInterval = 1200; // 10~30m: 1.2초
+      }
+
+      this.scheduleNextPing(nextInterval);
+    }, delayMs);
+  }
+
+  // 맑은 아날로그 핑/종소리 합성 (Web Audio Oscillator + StereoPanner)
+  playBeaconSound() {
+    if (!this.audioCtx) return;
+
+    try {
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gainNode = this.audioCtx.createGain();
+
+      // 상대 각도(relativeAngle: -180 ~ +180)를 Panning 값(-1.0 ~ +1.0)으로 변환
+      const panValue = Math.sin((this.currentRelativeAngle * Math.PI) / 180);
+
+      // StereoPannerNode 지원 여부 확인 후 적용
+      let pannerNode = null;
+      if (this.audioCtx.createStereoPanner) {
+        pannerNode = this.audioCtx.createStereoPanner();
+        pannerNode.pan.setValueAtTime(panValue, now);
+      }
+
+      // 음정 설정 (맑은 C6 = 1046.5Hz 아날로그 벨 소리)
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1046.5, now);
+
+      // 엔벨로프 (짧고 맑은 종소리 잔향 0.25초)
+      gainNode.gain.setValueAtTime(0.001, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.3, now + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+
+      // 노드 연결
+      if (pannerNode) {
+        osc.connect(gainNode);
+        gainNode.connect(pannerNode);
+        pannerNode.connect(this.audioCtx.destination);
+      } else {
+        osc.connect(gainNode);
+        gainNode.connect(this.audioCtx.destination);
+      }
+
+      osc.start(now);
+      osc.stop(now + 0.26);
+    } catch (e) {
+      console.error("Beacon sound play error:", e);
+    }
+  }
+
+  // 목적지 도착 차임벨 (도미솔 피치 사운드)
+  playArrivalChime() {
+    if (!this.audioCtx) return;
+    try {
+      const now = this.audioCtx.currentTime;
+      const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      freqs.forEach((freq, idx) => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+        const startTime = now + idx * 0.12;
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        gain.gain.setValueAtTime(0.001, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.25, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.4);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.42);
+      });
+    } catch (e) {
+      console.error("Arrival chime play error:", e);
+    }
+  }
+}
+
+const spatialGuide = new SpatialAudioGuide();
+
 // 경량 2D GPS 칼만 필터 클래스 (지능형 속도 기반 동적 노이즈 제어 & 이중 안전망)
 class GPSKalmanFilter {
   constructor(defaultProcessNoise = 0.8) {
@@ -166,6 +345,30 @@ const nearbyDesc = document.getElementById('nearby-desc');
 
 let gpsInterval = null;
 let lastAnnouncedSpotName = null; // TTS 중복 재생 방지용
+let currentHeading = 0; // 스마트폰 정면 나침반 방위각 (0 ~ 360도)
+
+// 지자기 센서(DeviceOrientation) 수신 및 저주파 필터링(Smoothing)
+function handleOrientation(event) {
+  let heading = null;
+  if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+    // iOS Safari
+    heading = event.webkitCompassHeading;
+  } else if (event.alpha !== null && event.alpha !== undefined) {
+    // Android / Standard
+    heading = (360 - event.alpha) % 360;
+  }
+
+  if (heading !== null) {
+    // 저주파 필터로 나침반 떨림 보정 (Low-pass Filter)
+    const diff = (heading - currentHeading + 540) % 360 - 180;
+    currentHeading = (currentHeading + diff * 0.2 + 360) % 360;
+  }
+}
+
+if (window.DeviceOrientationEvent) {
+  window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+  window.addEventListener('deviceorientation', handleOrientation, true);
+}
 
 // 한글 받침 여부를 확인하여 조사('이/가', '은/는', '을/를')를 붙여 반환하는 함수
 function getJosa(word, josa1, josa2) {
@@ -188,6 +391,11 @@ function fetchLocation() {
       const filtered = gpsFilter.process(rawLat, rawLon, accuracy, timestamp, hwSpeed);
       const currentLat = filtered.lat;
       const currentLon = filtered.lon;
+
+      // 3D 공간 음향 내비게이션 활성화 시 위치 및 방위각 실시간 갱신
+      if (spatialGuide.isActive) {
+        spatialGuide.update(currentLat, currentLon, currentHeading);
+      }
 
       console.log(`[GPS Kalman] Raw: (${rawLat.toFixed(6)}, ${rawLon.toFixed(6)}, Acc: ${accuracy.toFixed(1)}m, Speed: ${filtered.effectiveSpeed.toFixed(1)}m/s, Q: ${filtered.q}) -> Filtered: (${currentLat.toFixed(6)}, ${currentLon.toFixed(6)})`);
 
@@ -501,13 +709,17 @@ if (!SpeechRecognition) {
         if (searchMatchedSpot) {
           const cleanName = searchMatchedSpot.name.replace(/\([^)]*\)/g, '').trim();
           const nameWithJosa = getJosa(cleanName, '을', '를');
-          const replyText = `${nameWithJosa} 안내하겠습니다.`;
+          const replyText = `${nameWithJosa} 안내하겠습니다. 안전을 위해 외부 노출형 이어폰 착용을 권장합니다. 목적지 방향의 종소리를 따라 이동하세요.`;
           responseText.textContent = replyText;
+          
+          // 기존 안내 음성이 끝나면 3D 오디오 가이드 시작
           speakText(replyText, () => {
             isLocationGuidancePaused = false;
+            spatialGuide.start(searchMatchedSpot);
           });
           return; // Gemini 호출 없이 즉시 안내 및 리턴
         } else {
+          spatialGuide.stop(); // 미등록 장소 검색 시 기존 오디오 가이드 중지
           const notFoundText = "요청하신 위치를 찾을 수 없습니다.";
           responseText.textContent = notFoundText;
           speakText(notFoundText, () => {
@@ -753,6 +965,15 @@ if (!SpeechRecognition) {
 
   // 마이크 버튼 클릭 이벤트
   micBtn.addEventListener('click', () => {
+    // iOS Safari 지자기 센서 권한 요청 지원
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(permissionState => {
+        if (permissionState === 'granted') {
+          window.addEventListener('deviceorientation', handleOrientation, true);
+        }
+      }).catch(console.error);
+    }
+
     if (isListening) {
       // 듣고 있는 중이면 중지
       recognition.stop();
@@ -765,8 +986,9 @@ if (!SpeechRecognition) {
         isLocationGuidancePaused = false;
       }
     } else {
-      // 새로 시작 (대화가 시작되므로 GPS 안내 일시정지)
+      // 새로 시작 (대화가 시작되므로 GPS 안내 및 3D 사운드 가이드 일시정지)
       isLocationGuidancePaused = true;
+      spatialGuide.stop(); // 기존 진행 중인 오디오 내비게이션 중지
       if (window.speechSynthesis) window.speechSynthesis.cancel(); // 새로운 질문을 하면 기존 답변 읽던 것 중단
       stopLoadingSound(); // 혹시 로딩음이 실행 중이면 중단
       playMicSound(true); // 마이크 켜짐 효과음
