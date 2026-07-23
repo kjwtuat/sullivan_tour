@@ -194,8 +194,8 @@ export const tourData = [
   {
     name: "TYPE0_25",
     type: 0,
-    lat: 35.8840076,
-    lng: 128.5941514,
+    lat: 35.8839912,
+    lng: 128.5941312,
     descKo: "굴뚝 앞 남측",
     descEn: ""
   },
@@ -245,6 +245,38 @@ export const tourData = [
     lat: 35.8838156,
     lng: 128.5947296,
     descKo: "버거킹 출입문 앞 입니다.",
+    descEn: ""
+  },
+  {
+    name: "농생대로1",
+    type: 0,
+    lat: 35.8939181,
+    lng: 128.6129512,
+    descKo: "농생대 4호관 앞입니다.",
+    descEn: ""
+  },
+  {
+    name: "농생대로2",
+    type: 0,
+    lat: 35.8941375,
+    lng: 128.6128922,
+    descKo: "농업생명과학대학 4호관 2층입구입니다.",
+    descEn: ""
+  },
+  {
+    name: "경북대학교 제2북문",
+    type: 0,
+    lat: 35.8948865,
+    lng: 128.6123503,
+    descKo: "농장앞 제2북문 앞입니다.",
+    descEn: ""
+  },
+  {
+    name: "농업대학 실습장",
+    type: 0,
+    lat: 35.894577,
+    lng: 128.6125662,
+    descKo: "부근에 경북대학교 농업대학 실습장이 있습니다.",
     descEn: ""
   }
 ];
