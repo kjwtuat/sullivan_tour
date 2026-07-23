@@ -298,6 +298,13 @@ document.addEventListener('click', function enableNoSleep() {
 startGpsPolling();
 requestWakeLock(); // 앱 시작 시 화면 꺼짐 방지 요청
 
+// 앱 시작 10초 후 위치 탐색 자세 안내 TTS 출력
+setTimeout(() => {
+  if (!isLocationGuidancePaused) {
+    speakText("스마트폰을 가슴 높이로 들고 정면을 향해 주시면 위치 탐색이 더욱 정확해집니다.");
+  }
+}, 10000);
+
 // 탭/브라우저가 숨겨지면 GPS 요청 중지, 다시 열리면 재개 및 Wake Lock 재요청
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
